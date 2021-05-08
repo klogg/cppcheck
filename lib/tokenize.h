@@ -449,6 +449,9 @@ public:
     /** Simplify "if else" */
     void elseif();
 
+    /** Simplify C++17/C++20 if/switch/for initialization expression */
+    void simplifyIfSwitchForInit();
+
     /** Simplify conditions
      * @return true if something is modified
      *         false if nothing is done.
@@ -507,6 +510,12 @@ public:
      * into "void f(int x) {"
      */
     void simplifyFunctionParameters();
+
+    /** Simplify function level try blocks:
+     *  Convert "void f() try {} catch (int) {}"
+     *  to "void f() { try {} catch (int) {} }"
+     */
+    void simplifyFunctionTryCatch();
 
     /**
      * Simplify templates
@@ -617,7 +626,7 @@ private:
      * Send error message to error logger about internal bug.
      * @param tok the token that this bug concerns.
      */
-    void cppcheckError(const Token *tok) const;
+    NORETURN void cppcheckError(const Token *tok) const;
 
     /**
      * Setup links for tokens so that one can call Token::link().
@@ -642,6 +651,8 @@ public:
 
     /** Warn about unknown macro(s), configuration is recommended */
     NORETURN void unknownMacroError(const Token *tok1) const;
+
+    void unhandledCharLiteral(const Token *tok, const std::string& msg) const;
 
 private:
 
@@ -694,6 +705,9 @@ private:
 
     /** Remove alignas */
     void removeAlignas();
+
+    /** Simplify c++20 spaceship operator */
+    void simplifySpaceshipOperator();
 
     /**
      * Remove keywords "volatile", "inline", "register", and "restrict"

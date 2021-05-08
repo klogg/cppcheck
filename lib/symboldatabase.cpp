@@ -78,11 +78,10 @@ SymbolDatabase::SymbolDatabase(const Tokenizer *tokenizer, const Settings *setti
 
 static const Token* skipScopeIdentifiers(const Token* tok)
 {
-    if (tok && tok->str() == "::") {
+    if (Token::Match(tok, ":: %name%"))
         tok = tok->next();
-    }
     while (Token::Match(tok, "%name% ::") ||
-           (Token::Match(tok, "%name% <") && Token::simpleMatch(tok->linkAt(1), "> ::"))) {
+           (Token::Match(tok, "%name% <") && Token::Match(tok->linkAt(1), ">|>> ::"))) {
         if (tok->strAt(1) == "::")
             tok = tok->tokAt(2);
         else
@@ -2629,6 +2628,34 @@ bool Function::argsMatch(const Scope *scope, const Token *first, const Token *se
     return false;
 }
 
+static bool isUnknownType(const Token* start, const Token* end)
+{
+    while (Token::Match(start, "const|volatile"))
+        start = start->next();
+    start = skipScopeIdentifiers(start);
+    if (start->tokAt(1) == end && !start->type() && !start->isStandardType())
+        return true;
+    // TODO: Try to deduce the type of the expression
+    if (Token::Match(start, "decltype|typeof"))
+        return true;
+    return false;
+}
+
+bool Function::returnsConst(const Function* function, bool unknown)
+{
+    if (!function)
+        return false;
+    if (function->type != Function::eFunction)
+        return false;
+    const Token* defEnd = function->returnDefEnd();
+    if (Token::findsimplematch(function->retDef, "const", defEnd))
+        return true;
+    // Check for unknown types, which could be a const
+    if (isUnknownType(function->retDef, defEnd))
+        return unknown;
+    return false;
+}
+
 bool Function::returnsReference(const Function* function, bool unknown)
 {
     if (!function)
@@ -2639,17 +2666,7 @@ bool Function::returnsReference(const Function* function, bool unknown)
     if (defEnd->strAt(-1) == "&")
         return true;
     // Check for unknown types, which could be a reference
-    const Token* start = function->retDef;
-    while (Token::Match(start, "const|volatile"))
-        start = start->next();
-    if (Token::Match(start, ":: %name%"))
-        start = start->next();
-    while (Token::Match(start, "%name% :: %name%"))
-        start = start->tokAt(2);
-    if (start->tokAt(1) == defEnd && !start->type() && !start->isStandardType())
-        return unknown;
-    // TODO: Try to deduce the type of the expression
-    if (Token::Match(start, "decltype|typeof"))
+    if (isUnknownType(function->retDef, defEnd))
         return unknown;
     return false;
 }
@@ -4234,6 +4251,16 @@ const Token *Scope::checkVariable(const Token *tok, AccessControl varaccess, con
 
     // the start of the type tokens does not include the above modifiers
     const Token *typestart = tok;
+
+    // C++17 structured bindings
+    if (settings->standards.cpp >= Standards::CPP17 && Token::Match(tok, "auto &|&&| [")) {
+        const Token *typeend = Token::findsimplematch(typestart, "[")->previous();
+        for (tok = typeend->tokAt(2); Token::Match(tok, "%name%|,"); tok = tok->next()) {
+            if (tok->varId())
+                addVariable(tok, typestart, typeend, varaccess, nullptr, this, settings);
+        }
+        return typeend->linkAt(1);
+    }
 
     if (tok->isKeyword() && Token::Match(tok, "class|struct|union|enum")) {
         tok = tok->next();
@@ -5863,6 +5890,15 @@ void SymbolDatabase::setValueType(Token *tok, const ValueType &valuetype)
 
     if (mIsCpp && vt2 && Token::simpleMatch(parent->previous(), "decltype (")) {
         setValueType(parent, *vt2);
+        return;
+    }
+
+    // c++17 auto type deduction of braced init list
+    if (mIsCpp && mSettings->standards.cpp >= Standards::CPP17 && vt2 && Token::Match(parent->tokAt(-2), "auto %var% {")) {
+        Token *autoTok = parent->tokAt(-2);
+        setValueType(autoTok, *vt2);
+        setAutoTokenProperties(autoTok);
+        const_cast<Variable *>(parent->previous()->variable())->setValueType(*vt2);
         return;
     }
 

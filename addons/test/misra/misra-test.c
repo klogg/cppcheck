@@ -1,4 +1,5 @@
 // To test:
+// ~/cppcheck/cppcheck --dump misra/misra-test.h --std=c89
 // ~/cppcheck/cppcheck --dump --suppress=uninitvar --suppress=uninitStructMember misra/misra-test.c --std=c89 && python3 ../misra.py -verify misra/misra-test.c.dump
 
 #include "path\file.h" // 20.2
@@ -146,7 +147,7 @@ int c41_10        = '\12\n';
 int c41_11        = '\12n';  // 4.1
 int c41_12         = '\12323'; // 4.1
 int c41_13         = '\123\3';
-int c41_14         = '\777\777';
+// TODO int c41_14         = '\777\777';
 int c41_15         = 'a';
 
 void misra_4_1(void)
@@ -254,13 +255,25 @@ void misra_7_2(void) {
     misra_7_2_call_va_test(1, 2, 3);
 }
 
+// The addon should not generate false positives for the identifiers.
+struct misra_7_3_s
+{
+  uint32_t ul_clka;
+  uint32_t test123l;
+};
+
 void misra_7_3(void) {
   long misra_7_3_a = 0l; //7.3
   long misra_7_3_b = 0lU; //7.3
   long long misra_7_3_c = 0Ull; //7.3
   long long misra_7_3_d = 0ll; //7.3
   long double misra_7_3_e = 7.3l; //7.3
-  }
+  struct misra_7_3_s misra_7_3_f =
+  {
+    .ul_clka = 19U,
+    .test123l = 23U
+  };
+}
 
 typedef const char* MISRA_7_4_CHAR_CONST;
 MISRA_7_4_CHAR_CONST misra_7_4_return_const_type_def (void) { return "return_typedef_const"; }

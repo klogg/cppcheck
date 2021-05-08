@@ -47,6 +47,7 @@ private:
         TEST_CASE(wrong_syntax4); // #3618
         TEST_CASE(wrong_syntax_if_macro);  // #2518 - if MACRO()
         TEST_CASE(wrong_syntax_class_x_y); // #3585 - class x y { };
+        TEST_CASE(wrong_syntax_anonymous_struct);
         TEST_CASE(syntax_case_default);
         TEST_CASE(garbageCode1);
         TEST_CASE(garbageCode2); // #4300
@@ -403,6 +404,11 @@ private:
         }
     }
 
+    void wrong_syntax_anonymous_struct() {
+        ASSERT_THROW(checkCode("struct { int x; } = {0};"), InternalError);
+        ASSERT_THROW(checkCode("struct { int x; } * = {0};"), InternalError);
+    }
+
     void syntax_case_default() {
         ASSERT_THROW(checkCode("void f() {switch (n) { case: z(); break;}}"), InternalError);
 
@@ -681,7 +687,7 @@ private:
     }
 
     void garbageCode55() { // #6724
-        checkCode("() __attribute__((constructor)); { } { }");
+        ASSERT_THROW(checkCode("() __attribute__((constructor)); { } { }"), InternalError);
     }
 
     void garbageCode56() { // #6713
